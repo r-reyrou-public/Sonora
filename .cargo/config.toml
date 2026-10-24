@@ -1,0 +1,3 @@
+# VC++ 再頒布可能パッケージが無い PC でも EXE 単体で動くよう、C ランタイムを EXE に組み込む
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

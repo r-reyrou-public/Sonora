@@ -1,0 +1,11 @@
+﻿# Build output
+target/
+*.exe
+
+# User data (never commit)
+settings.ini
+library.bin
+library.bin.corrupt
+*.cache
+backups/
+data_location.txt

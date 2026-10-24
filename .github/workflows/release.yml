@@ -1,0 +1,51 @@
+name: release
+
+# 公開リポジトリのソースから、GitHub 上で Sonora.exe をビルドする。
+# 誰でも同じ手順を確かめられ、ビルド証明（attestation）で「このソースからできた exe」であることを検証できる。
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust (stable, MSVC)
+        run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
+
+      - name: Build
+        shell: pwsh
+        run: |
+          # C ランタイムを組み込み、ビルド環境のパスが exe に残らないようにする
+          $env:RUSTFLAGS = "-C target-feature=+crt-static --remap-path-prefix=$env:GITHUB_WORKSPACE=/sonora --remap-path-prefix=$env:USERPROFILE\.cargo=/cargo --remap-path-prefix=$env:USERPROFILE=/home"
+          cargo build --release --locked
+          Copy-Item target\release\sonora.exe Sonora.exe
+          (Get-FileHash Sonora.exe -Algorithm SHA256).Hash.ToLower() + "  Sonora.exe" | Out-File -Encoding ascii SHA256SUMS.txt
+          Get-Content SHA256SUMS.txt
+
+      - name: Build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: Sonora.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sonora
+          path: |
+            Sonora.exe
+            SHA256SUMS.txt
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.ref_name }}" Sonora.exe SHA256SUMS.txt --clobber
